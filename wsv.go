@@ -5,39 +5,39 @@ import (
 	"strings"
 )
 
-const CODEPOINT_LINEFEED = 0x0A
-const CODEPOINT_DOUBLEQUOTE = 0x22
-const CODEPOINT_HASH = 0x23
-const CODEPOINT_SLASH = 0x2F
+const codepoint_LINEFEED = 0x0A
+const codepoint_DOUBLEQUOTE = 0x22
+const codepoint_HASH = 0x23
+const codepoint_SLASH = 0x2F
 
-type BasicWsvCharIterator struct {
+type basicWsvCharIterator struct {
 	chars     []rune
 	index     int
 	lineIndex int
 }
 
-func (x *BasicWsvCharIterator) isEnd() bool {
+func (x *basicWsvCharIterator) isEnd() bool {
 	return x.index >= len(x.chars)
 }
 
-func (x *BasicWsvCharIterator) is(c rune) bool {
+func (x *basicWsvCharIterator) is(c rune) bool {
 	return rune(x.chars[x.index]) == c
 }
 
-func (x *BasicWsvCharIterator) isWhitespace() bool {
+func (x *basicWsvCharIterator) isWhitespace() bool {
 	return isWhitespace(rune(x.chars[x.index]))
 }
 
-func (x *BasicWsvCharIterator) next() bool {
+func (x *basicWsvCharIterator) next() bool {
 	x.index = x.index + 1
 	return !x.isEnd()
 }
 
-func (x *BasicWsvCharIterator) get() rune {
+func (x *basicWsvCharIterator) get() rune {
 	return rune(x.chars[x.index])
 }
 
-func (x *BasicWsvCharIterator) getSlice(startIndex int) []rune {
+func (x *basicWsvCharIterator) getSlice(startIndex int) []rune {
 	return []rune(x.chars[startIndex:x.index])
 }
 
@@ -55,7 +55,7 @@ func isWhitespace(c rune) bool {
 		c == 0x3000
 }
 
-func getCodePoints(s string) []rune {
+func getcodepoints(s string) []rune {
 	var result []rune
 	for _, c := range s {
 		result = append(result, rune(c))
@@ -103,19 +103,19 @@ func ParseLineAsArray(content string) ([]string, error) {
 }
 
 func parseLine(lineStrWithoutLinefeed string, lineIndex int) ([]string, error) {
-	var iterator = BasicWsvCharIterator{getCodePoints(lineStrWithoutLinefeed), 0, lineIndex}
+	var iterator = basicWsvCharIterator{getcodepoints(lineStrWithoutLinefeed), 0, lineIndex}
 	var values []string
 	for {
 		skipWhitespace(&iterator)
 		if iterator.isEnd() {
 			break
 		}
-		if iterator.is(CODEPOINT_HASH) {
+		if iterator.is(codepoint_HASH) {
 			break
 		}
 
 		var curValue string
-		if iterator.is(CODEPOINT_DOUBLEQUOTE) {
+		if iterator.is(codepoint_DOUBLEQUOTE) {
 
 			var err error
 			curValue, err = parseDoubleQuotedValue(&iterator)
@@ -141,15 +141,15 @@ func parseLine(lineStrWithoutLinefeed string, lineIndex int) ([]string, error) {
 	return values, nil
 }
 
-func parseValue(iterator *BasicWsvCharIterator) (string, error) {
+func parseValue(iterator *basicWsvCharIterator) (string, error) {
 	var startIndex = iterator.index
 	for {
 		if !iterator.next() {
 			break
 		}
-		if iterator.isWhitespace() || iterator.is(CODEPOINT_HASH) {
+		if iterator.isWhitespace() || iterator.is(codepoint_HASH) {
 			break
-		} else if iterator.is(CODEPOINT_DOUBLEQUOTE) {
+		} else if iterator.is(codepoint_DOUBLEQUOTE) {
 			return "", errors.New("invalid double quote in value")
 
 		}
@@ -159,24 +159,24 @@ func parseValue(iterator *BasicWsvCharIterator) (string, error) {
 
 }
 
-func parseDoubleQuotedValue(iterator *BasicWsvCharIterator) (string, error) {
+func parseDoubleQuotedValue(iterator *basicWsvCharIterator) (string, error) {
 	var value = ""
 	for {
 		if !iterator.next() {
 			return "", errors.New("string not closed")
 		}
-		if iterator.is(CODEPOINT_DOUBLEQUOTE) {
+		if iterator.is(codepoint_DOUBLEQUOTE) {
 			if !iterator.next() {
 				break
 			}
-			if iterator.is(CODEPOINT_DOUBLEQUOTE) {
+			if iterator.is(codepoint_DOUBLEQUOTE) {
 				value += "\""
-			} else if iterator.is(CODEPOINT_SLASH) {
-				if !iterator.next() && iterator.is(CODEPOINT_DOUBLEQUOTE) {
+			} else if iterator.is(codepoint_SLASH) {
+				if !iterator.next() && iterator.is(codepoint_DOUBLEQUOTE) {
 					return "", errors.New("invalid string line break")
 				}
 				value += "\n"
-			} else if iterator.isWhitespace() || iterator.is(CODEPOINT_HASH) {
+			} else if iterator.isWhitespace() || iterator.is(codepoint_HASH) {
 				break
 			} else {
 				return "", errors.New("invalid character after string")
@@ -189,7 +189,7 @@ func parseDoubleQuotedValue(iterator *BasicWsvCharIterator) (string, error) {
 	return value, nil
 }
 
-func skipWhitespace(iterator *BasicWsvCharIterator) {
+func skipWhitespace(iterator *basicWsvCharIterator) {
 	if iterator.isEnd() {
 		return
 	}
