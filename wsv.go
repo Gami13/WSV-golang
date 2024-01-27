@@ -55,7 +55,7 @@ func isWhitespace(c rune) bool {
 		c == 0x3000
 }
 
-func getcodepoints(s string) []rune {
+func getCodePoints(s string) []rune {
 	var result []rune
 	for _, c := range s {
 		result = append(result, rune(c))
@@ -103,7 +103,7 @@ func ParseLineAsArray(content string) ([]string, error) {
 }
 
 func parseLine(lineStrWithoutLinefeed string, lineIndex int) ([]string, error) {
-	var iterator = basicWsvCharIterator{getcodepoints(lineStrWithoutLinefeed), 0, lineIndex}
+	var iterator = basicWsvCharIterator{getCodePoints(lineStrWithoutLinefeed), 0, lineIndex}
 	var values []string
 	for {
 		skipWhitespace(&iterator)
@@ -193,25 +193,83 @@ func skipWhitespace(iterator *basicWsvCharIterator) {
 	if iterator.isEnd() {
 		return
 	}
-	// if iterator.next() {
-	// 	if !iterator.isWhitespace() {
-	// 		return
-	// 	}
-	// }
-	// for {
 
-	// 	if !iterator.isWhitespace() {
-	// 		return
-	// 	}
-	// 	if !iterator.next() {
-	// 		break
-
-	// 	}
-	// }
-
+	//Bascially a do-while loop
 	for ok := true; ok; ok = iterator.next() {
 		if !iterator.isWhitespace() {
 			break
 		}
 	}
+}
+
+func needsDoubleQuotes(value string) bool {
+	if len(value) == 0 || value == "-" {
+		return true
+	}
+
+	chars := getCodePoints(value)
+	return containsSpecialChar(chars)
+}
+
+func containsSpecialChar(chars []rune) bool {
+	for _, c := range chars {
+		if isWhitespace(c) || c == codepoint_LINEFEED || c == codepoint_DOUBLEQUOTE || c == codepoint_HASH {
+			return true
+		}
+	}
+	return false
+}
+
+func serializeValue(value string) string {
+	if len(value) == 0 {
+		return "\"\""
+	} else if value == "-" {
+		return "\"-\""
+	} else {
+		chars := getCodePoints(value)
+		if containsSpecialChar(chars) {
+			var result = "\""
+			for _, c := range chars {
+				if c == codepoint_LINEFEED {
+					result += "\"/\""
+				} else if c == codepoint_DOUBLEQUOTE {
+					result += "\"\""
+				} else {
+					result += string(c)
+				}
+			}
+			result += "\""
+			return result
+		} else {
+			return value
+		}
+	}
+}
+
+func SerializeRow(values []string) string {
+	isFirst := true
+	result := ""
+	for _, value := range values {
+		if !isFirst {
+			result += " "
+		} else {
+			isFirst = false
+		}
+		result += serializeValue(value)
+	}
+	return result
+}
+
+func Serialize(values [][]string) string {
+	isFirst := true
+	result := ""
+	for _, line := range values {
+		if !isFirst {
+			result += "\n"
+		} else {
+			isFirst = false
+		}
+		result += SerializeRow(line)
+	}
+	return result
 }
