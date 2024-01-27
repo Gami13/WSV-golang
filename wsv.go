@@ -1,4 +1,4 @@
-package wsvgolang
+package wsv
 
 import (
 	"errors"
@@ -25,7 +25,7 @@ func (x *BasicWsvCharIterator) is(c rune) bool {
 }
 
 func (x *BasicWsvCharIterator) isWhitespace() bool {
-	return (WsvChar).isWhitespace(WsvChar{}, rune(x.chars[x.index]))
+	return isWhitespace(rune(x.chars[x.index]))
 }
 
 func (x *BasicWsvCharIterator) next() bool {
@@ -41,9 +41,7 @@ func (x *BasicWsvCharIterator) getSlice(startIndex int) []rune {
 	return []rune(x.chars[startIndex:x.index])
 }
 
-type WsvChar struct{}
-
-func (WsvChar) isWhitespace(c rune) bool {
+func isWhitespace(c rune) bool {
 	return c == 0x09 ||
 		(c >= 0x0B && c <= 0x0D) ||
 		c == 0x20 ||
@@ -57,7 +55,7 @@ func (WsvChar) isWhitespace(c rune) bool {
 		c == 0x3000
 }
 
-func (x WsvChar) getCodePoints(s string) []rune {
+func getCodePoints(s string) []rune {
 	var result []rune
 	for _, c := range s {
 		result = append(result, rune(c))
@@ -65,44 +63,50 @@ func (x WsvChar) getCodePoints(s string) []rune {
 	return result
 }
 
-type WsvLine struct{}
-
-func (x *WsvLine) parseAsArray(content string) []string {
-	return (WsvParser).parseLineAsArray(WsvParser{}, content)
+// Parses a WSV document's line as an array of strings.
+func ParseAsArray(content string) ([]string, error) {
+	return ParseLineAsArray(content)
 }
 
-type WsvDocument struct {
+// Parses a WSV document as a jagged array of strings.
+func ParseAsJaggedArray(content string) ([][]string, error) {
+	return ParseDocument(content)
 }
 
-func (x *WsvDocument) parseAsJaggedArray(content string) [][]string {
-	return (WsvParser).parseDocumentNonPreserving(WsvParser{}, content)
-}
+func ParseDocument(content string) ([][]string, error) {
 
-type WsvParser struct {
-}
-
-func (x WsvParser) parseDocumentNonPreserving(content string) [][]string {
 	var lines = strings.Split(content, "\n")
+
 	var result [][]string
 	for i := 0; i < len(lines); i++ {
 
 		var lineStr = lines[i]
-		var lineValues = x.parseLine(lineStr, i)
+		lineValues, err := parseLine(lineStr, i)
+		if err != nil {
+			return nil, err
+		}
 		result = append(result, lineValues)
 
 	}
-	return result
+	return result, nil
 }
 
-func (x WsvParser) parseLineAsArray(content string) []string {
-	return x.parseDocumentNonPreserving(content)[0]
+func ParseLineAsArray(content string) ([]string, error) {
+	result, err := ParseDocument(content)
+	if err != nil {
+		return nil, err
+	}
+	if len(result) == 0 {
+		return nil, errors.New("empty document")
+	}
+	return result[0], nil
 }
 
-func (x *WsvParser) parseLine(lineStrWithoutLinefeed string, lineIndex int) []string {
-	var iterator = BasicWsvCharIterator{(WsvChar).getCodePoints(WsvChar{}, lineStrWithoutLinefeed), 0, lineIndex}
+func parseLine(lineStrWithoutLinefeed string, lineIndex int) ([]string, error) {
+	var iterator = BasicWsvCharIterator{getCodePoints(lineStrWithoutLinefeed), 0, lineIndex}
 	var values []string
 	for {
-		x.skipWhitespace(&iterator)
+		skipWhitespace(&iterator)
 		if iterator.isEnd() {
 			break
 		}
@@ -114,16 +118,16 @@ func (x *WsvParser) parseLine(lineStrWithoutLinefeed string, lineIndex int) []st
 		if iterator.is(CODEPOINT_DOUBLEQUOTE) {
 
 			var err error
-			curValue, err = x.parseDoubleQuotedValue(&iterator)
+			curValue, err = parseDoubleQuotedValue(&iterator)
 			if err != nil {
-				//TODO: error handling
+				return nil, err
 			}
 		} else {
 
 			var err error
-			curValue, err = x.parseValue(&iterator)
+			curValue, err = parseValue(&iterator)
 			if err != nil {
-				//TODO: error handling
+				return nil, err
 			}
 			if curValue == "-" {
 
@@ -134,10 +138,10 @@ func (x *WsvParser) parseLine(lineStrWithoutLinefeed string, lineIndex int) []st
 		values = append(values, curValue)
 	}
 
-	return values
+	return values, nil
 }
 
-func (x *WsvParser) parseValue(iterator *BasicWsvCharIterator) (string, error) {
+func parseValue(iterator *BasicWsvCharIterator) (string, error) {
 	var startIndex = iterator.index
 	for {
 		if !iterator.next() {
@@ -155,14 +159,14 @@ func (x *WsvParser) parseValue(iterator *BasicWsvCharIterator) (string, error) {
 
 }
 
-func (x *WsvParser) parseDoubleQuotedValue(iterator *BasicWsvCharIterator) (string, error) {
+func parseDoubleQuotedValue(iterator *BasicWsvCharIterator) (string, error) {
 	var value = ""
 	for {
 		if !iterator.next() {
 			return "", errors.New("string not closed")
 		}
 		if iterator.is(CODEPOINT_DOUBLEQUOTE) {
-			if iterator.next() {
+			if !iterator.next() {
 				break
 			}
 			if iterator.is(CODEPOINT_DOUBLEQUOTE) {
@@ -185,21 +189,29 @@ func (x *WsvParser) parseDoubleQuotedValue(iterator *BasicWsvCharIterator) (stri
 	return value, nil
 }
 
-func (x *WsvParser) skipWhitespace(iterator *BasicWsvCharIterator) {
+func skipWhitespace(iterator *BasicWsvCharIterator) {
 	if iterator.isEnd() {
 		return
 	}
-	if !iterator.isWhitespace() {
-		return
-	}
-	for {
+	// if iterator.next() {
+	// 	if !iterator.isWhitespace() {
+	// 		return
+	// 	}
+	// }
+	// for {
 
+	// 	if !iterator.isWhitespace() {
+	// 		return
+	// 	}
+	// 	if !iterator.next() {
+	// 		break
+
+	// 	}
+	// }
+
+	for ok := true; ok; ok = iterator.next() {
 		if !iterator.isWhitespace() {
-			return
-		}
-		if !iterator.next() {
 			break
-
 		}
 	}
 }
