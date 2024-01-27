@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	wsv "github.com/Gami13/WSV-golang"
+	wsv "github.com/Gami13/wsv-golang"
 )
 
 // a 	U+0061    61            0061        "Latin Small Letter A"
